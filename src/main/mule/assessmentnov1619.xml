@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="41cc32a2-00b8-4f2f-ad62-d97d26a31079" >
+		<http:listener-connection host="0.0.0.0" port="${http.port}" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="243c7ead-5e82-429a-98ab-d32a368dd283" >
+		<salesforce:cached-basic-connection username="${sf.username}" password="${sf.password}" securityToken="${sf.token}" />
+	</salesforce:sfdc-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="ea22751a-81bf-42c7-96eb-9ee2960cddf2" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="40573a18-7163-404d-af8c-8c680d282fa6" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}"/>
+	</db:config>
+	<flow name="retrieve" doc:id="11d84223-92b4-4c3d-9521-56ff61445fae" >
+		<http:listener doc:name="Listener" doc:id="158ec63e-8ca4-4040-9c13-fd0a54f232ab" config-ref="HTTP_Listener_config" path="/retrieve"/>
+		<salesforce:query doc:name="Query" doc:id="1385e149-d1f4-4997-b2fb-a93bf82146a6" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT BillingCity,BillingCountry,BillingPostalCode,BillingState,BillingStreet,Id,Name FROM Account</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="814ebefe-4a01-4afd-ac2a-dd06d9db4f4f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="assessmentnov1619Flow1" doc:id="4c2ab1e8-ecd6-4c54-9ad6-79189c0da61b" >
+		<scheduler doc:name="Scheduler" doc:id="7263eb5c-dc3e-4e1b-a4ff-99c2fe79e997" >
+			<scheduling-strategy >
+				<cron expression="${cron}"/>
+			</scheduling-strategy>
+		</scheduler>
+		<salesforce:query doc:name="Query" doc:id="f9d87754-5def-479a-a776-82f1d7f2eeaa" config-ref="Salesforce_Config" >
+			<salesforce:salesforce-query >SELECT BillingCity,BillingCountry,BillingPostalCode,BillingState,BillingStreet,Id,Name FROM Account</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="b6c706a1-cbe9-44c6-8020-8ed45faedc4e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="cf339520-2582-4fb4-bc37-b1b6ba523733" />
+		<db:bulk-insert doc:name="Bulk insert" doc:id="61d22cde-ca64-417a-ba44-5f9a105dff24" config-ref="Database_Config">
+			<db:bulk-input-parameters><![CDATA[#[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	BillingCountry: payload01.BillingCountry,
+	BillingStreet: payload01.BillingStreet,
+	BillingCity: payload01.BillingCity,
+	name: payload01.Name,
+	BillingPostalCode: payload01.BillingPostalCode,
+	Id: payload01.Id,
+	BillingState: payload01.BillingState
+}]]]></db:bulk-input-parameters>
+			<db:sql>INSERT INTO lazyFashions (name, BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, salesforce Id)
+VALUES  (:name, :BillingStreet, :BillingCity, :BillingState, :BillingPostalCode, :BillingCountry, :Id)</db:sql>
+		</db:bulk-insert>
+		<ee:transform doc:name="Transform Message" doc:id="a5da1b12-3f21-4347-9d95-006b99a6e8a8">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="accept" doc:id="9e39aafc-6fb5-41b6-9b60-71f7ad4fe289" >
+		<http:listener doc:name="Listener" doc:id="d86ea5ec-cbbe-4b95-bb67-e53d9800280b" config-ref="HTTP_Listener_config" path="/accept" allowedMethods="POST" outputMimeType="application/json"/>
+		<json:validate-schema doc:name="Validate schema" doc:id="71994933-9474-4b79-bae7-c321d91286e5" schema="schema.json">
+			<json:content ><![CDATA[#[%dw 2.0
+output application/json
+---
+payload]]]></json:content>
+		</json:validate-schema>
+		<salesforce:create type="Account" doc:name="Create" doc:id="dace6171-0f26-4e73-9823-a7bab0513a0b" config-ref="Salesforce_Config">
+			<salesforce:records ><![CDATA[#[output application/java
+---
+[{
+	Name: payload."Name",
+	BillingStreet: payload."BillingStreet",
+	BillingCity: payload."BillingCity",
+	BillingState: payload."BillingState",
+	BillingPostalCode: payload."BillingPostalCode",
+	BillingCountry: payload."BillingCountry"
+}]]]]></salesforce:records>
+		</salesforce:create>
+		<ee:transform doc:name="Transform Message" doc:id="f99163eb-9e45-4059-9a3b-73835fb4f214" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="assessmentnov1619Flow" doc:id="70857861-ea0a-47dc-acc3-16d4d2bc8788" >
+		<http:listener doc:name="Listener" doc:id="f09d4eeb-1f99-4945-9acf-8d605076af8c" config-ref="HTTP_Listener_config" path="/update" allowedMethods="PUT"/>
+		<set-variable value="#[attributes.queryParams.Id]" doc:name="sfid" doc:id="05314259-dc27-428f-bcab-6d37e8913dc8" variableName="sfid"/>
+		<salesforce:query doc:name="Query" doc:id="e82eca00-82c4-4f23-88e2-eb9c55a9a460" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT AccountNumber,BillingAddress,BillingCity,BillingCountry,BillingPostalCode,BillingState,BillingStreet,Id,Name FROM Account
+where Id = ':Id'</salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"Id" : vars.sfid
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="95772286-acd5-4735-ad4d-af38982baae3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:update doc:name="Update" doc:id="b5857ba3-54c9-4bed-a754-80335257eff7" config-ref="Salesforce_Config" type="Account">
+			<salesforce:records ><![CDATA[#[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	Id: vars.sfid as String,
+	Name: payload01.Name,
+	BillingStreet: payload01.BillingStreet,
+	BillingCity: payload01.BillingCity,
+	BillingState: payload01.BillingState,
+	BillingPostalCode: payload01.BillingPostalCode,
+	BillingCountry: payload01.BillingCountry
+}]]]></salesforce:records>
+		</salesforce:update>
+		<ee:transform doc:name="Transform Message" doc:id="c85cd536-3ee9-43ab-a441-02cb1a56ad86" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

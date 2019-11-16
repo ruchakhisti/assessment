@@ -1,0 +1,14 @@
+sf:
+  username: "rucha.khisti@apisero.com"
+  password: "apisero205"
+  token: "EpufBh0As8xOoh8h8PqpDYzZg"
+
+db:
+  user: "ruchakhisti"
+  host: "db4free.net"
+  port: "3306"
+  password: "46prashant"
+  database: "bookspractise"
+  
+cron: 0 0 0 ? * * *
+  
